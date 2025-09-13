@@ -1,0 +1,151 @@
+```
+Network Infrastructure Final Project - NTI
+===========================================
+
+PHYSICAL TOPOLOGY:
+==================
+
+                Internet/External (optional)
+                        │
+                ┌───────┴──────┐
+                │ Cloud Router │ 
+                │ 172.16.0.1   │
+                │              │
+                └───┬──────┬───┘
+                    │      │
+               10.1.1.0/30 │ │ 10.2.2.0/30
+                    │      │
+        ┌───────────▼──┐   │   ┌───▼─────────────┐
+        │ Cairo HQ     │   │   │ Luxor Branch    │
+        │ Multilayer   │   │   │ Router          │
+        │ Switch (L3)  │   │   │ 10.2.2.1        │
+        │ 10.1.1.1     │   │   │                 │
+        └──────┬───────┘   │   │ Services:       │
+               │           │   │ - DHCP Server   │
+               │           │   │ - Web Server    │
+               │           │   │   (10.2.2.100)  │
+               │           │   └─────────────────┘
+               │
+    ┌──────────┼──────────┐
+    │          │          │
+┌───▼───┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐
+│VLAN10 │ │VLAN20 │ │VLAN30 │ │VLAN40 │
+│ Mgmt  │ │ Sales │ │  IT   │ │Finance│
+│.10.0/24│ │.20.0/24│ │.30.0/24│ │.40.0/24│
+│   .1  │ │   .1  │ │   .1  │ │   .1  │
+└───┬───┘ └───┬───┘ └───┬───┘ └───┬───┘
+    │         │         │         │
+[Devices]  [Devices] [Devices] [Devices]
+.11-.100   .11-.100  .11-.100  .11-.100
+
+LOGICAL TOPOLOGY - SECURITY ZONES:
+==================================
+
+┌─────────────────┐    ┌─────────────────┐
+│   Management    │    │    Finance      │
+│   VLAN 10       │ ❌ │    VLAN 40      │
+│ 192.168.10.0/24 │────│ 192.168.40.0/24 │
+└─────────────────┘    └─────────────────┘
+        │                       ▲
+        │                       │
+        ▼                       │
+┌─────────────────┐             │
+│     Sales       │             │
+│    VLAN 20      │             │
+│ 192.168.20.0/24 │─────────────┘
+└─────────┬───────┘
+          │
+          │ ❌ (Web Server Access)
+          ▼
+    ┌───────────┐
+    │Web Server │
+    │10.2.2.100 │
+    └───────────┘
+          ▲
+          │ ✅
+    ┌─────────────────┐
+    │       IT        │
+    │    VLAN 30      │
+    │ 192.168.30.0/24 │
+    └─────────────────┘
+
+ROUTING TOPOLOGY:
+=================
+
+Cairo HQ (EIGRP AS 100)
+├── 192.168.10.0/24 (VLAN 10)
+├── 192.168.20.0/24 (VLAN 20)
+├── 192.168.30.0/24 (VLAN 30)
+├── 192.168.40.0/24 (VLAN 40)
+└── 10.1.1.0/30 (WAN to Cloud)
+    │
+    │ EIGRP Neighbors
+    ▼
+Cloud Router (EIGRP AS 100)
+├── 10.1.1.0/30 (to Cairo)
+├── 10.2.2.0/30 (to Luxor)
+└── 172.16.0.0/16 (Internal)
+    │
+    │ EIGRP Neighbors
+    ▼
+Luxor Branch (EIGRP AS 100)
+├── 10.2.2.0/30 (WAN to Cloud)
+├── 10.2.2.0/24 (Local Services)
+└── 172.16.1.1/32 (Loopback)
+
+DHCP FLOW:
+==========
+1. Client in VLAN X requests IP
+2. Request hits VLAN interface on Cairo switch
+3. DHCP relay (ip helper-address 10.2.2.2) forwards to Luxor
+4. Luxor DHCP server responds with:
+   - IP from appropriate range (.11-.100)
+   - Gateway = VLAN interface (.1)
+   - DNS = 8.8.8.8, 8.8.4.4
+   - Domain = netinfra.local
+
+SECURITY CONTROLS:
+==================
+ACL: MGMT_FINANCE_BLOCK
+├── DENY: 192.168.10.0/24 → 192.168.40.0/24
+└── PERMIT: any → any
+Applied: VLAN 10 interface (outbound)
+
+ACL: SALES_WEB_BLOCK  
+├── DENY: 192.168.20.0/24 → 10.2.2.100/32
+├── DENY: 192.168.20.0/24 → 10.2.2.10/32
+└── PERMIT: any → any
+Applied: VLAN 20 interface (outbound)
+
+TRAFFIC FLOW EXAMPLES:
+======================
+✅ ALLOWED:
+- VLAN 30 (IT) → VLAN 40 (Finance)
+- VLAN 30 (IT) → Web Server (10.2.2.100)
+- VLAN 10 (Mgmt) → VLAN 20 (Sales)
+- VLAN 10 (Mgmt) → VLAN 30 (IT)
+- Any VLAN → Internet (via cloud)
+
+❌ BLOCKED:
+- VLAN 10 (Mgmt) → VLAN 40 (Finance)
+- VLAN 20 (Sales) → Web Server (10.2.2.100)
+
+DEVICE SUMMARY:
+===============
+Cairo HQ Switch (192.168.x.1):
+- Layer 3 switch with inter-VLAN routing
+- EIGRP AS 100 participant
+- ACL enforcement point
+- DHCP relay agent
+
+Luxor Router (10.2.2.1):
+- WAN connectivity via EIGRP
+- Centralized DHCP server
+- Web server host (10.2.2.100)
+- Service aggregation point
+
+Cloud Router (172.16.0.1):
+- WAN simulation device
+- EIGRP route redistribution
+- Inter-site connectivity hub
+```
